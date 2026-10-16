@@ -1,0 +1,98 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config LVX_USE_DEMO_CONTEST2026_378_ESP32_AI
+	bool "Contest 2026 team 378 esp32_ai (OpenVela Barista port)"
+	default n
+	---help---
+		Enable the contest 2026 team 378 esp32_ai demo: a port of the
+		upstream esp32-ai "Barista" single-head LLM to OpenVela/NuttX on
+		the ESP32-P4X-Function-EV-Board.
+
+		The port is staged per docs/esp32-ai-移植至ESP32-P4X-OpenVela部署方案.md:
+		P1 self-check first, then the P2 serial Q&A MVP.  No display and no
+		dual-core work is performed by this application; it runs on one
+		core and returns to NSH when the chat session ends.
+
+if LVX_USE_DEMO_CONTEST2026_378_ESP32_AI
+
+config ESP32_AI_MODEL_STORAGE
+	bool "Register the model storage MTD device at board bring-up"
+	default n
+	depends on ESPRESSIF_SPIFLASH
+	---help---
+		When enabled, the board registers a read-only MTD character
+		device (/dev/model) over the flash region defined by
+		CONFIG_ESP32_AI_MODEL_FLASH_OFFSET/SIZE, so the application can
+		perform bounded random reads of the model without assuming a
+		mmap facility exists.
+
+		The region must not overlap the NuttX simple-boot image at
+		0x2000 or any other reserved/erase range.  Validate the chosen
+		offset/size against the real image size before writing a model
+		(see the deployment plan, flash capacity table).
+
+config ESP32_AI_MODEL_FLASH_OFFSET
+	hex "Model storage flash offset (byte address in SPI flash)"
+	default 0x800000
+	depends on ESP32_AI_MODEL_STORAGE
+	---help---
+		Start of the model region in SPI flash.  Defaults to 8 MiB to
+		stay clear of the NuttX image and the default storage MTD area;
+		re-measure against the actual image end before writing.
+
+config ESP32_AI_MODEL_FLASH_SIZE
+	hex "Model storage flash size"
+	default 0x500000
+	depends on ESP32_AI_MODEL_STORAGE
+	---help---
+		Size of the model region.  Barista model.bin is 4,600,186 B
+		(~0x4631FA), so 0x500000 (5 MiB) leaves room for alignment and
+		metadata; enlarge if a full 4 MiB+ region plus alignment is not
+		enough.  Must be a multiple of the flash erase/sector size.
+
+config ESP32_AI_MODEL_SIZE
+	hex "Expected model.bin size in bytes"
+	default 0x4631fa
+	---help---
+		Expected byte length of model.bin (Barista = 4,600,186 B).
+		The self-check compares the image length read from flash against
+		this value; a mismatch refuses inference (version binding).
+
+config ESP32_AI_MODEL_SHA256
+	string "Expected SHA-256 of model.bin (hex, lowercase)"
+	default ""
+	---help---
+		Host-side fingerprint of the exact model.bin release, taken from
+		the upstream fetch_model.sh / metadata.json checksum.  The
+		device does not compute SHA-256; the self-check uses this value
+		only as recorded provenance.  Leave empty until the model has
+		been downloaded and verified.
+
+config ESP32_AI_EXPECT_PSRAM_BYTES
+	int "Expected PSRAM size in bytes (user heap)"
+	default 8388608
+	---help---
+		Expected capacity of the PSRAM chip (8 MiB on the P4X EV board
+		per board documentation; confirm on the actual unit).  Used by
+		the self-check to detect whether the user heap really is
+		PSRAM-backed (mallinfo().arena >= this value) instead of
+		guessing from labels.
+
+config ESP32_AI_BARISTA_RESOURCES
+	bool "Build with the generated Barista resource headers"
+	default n
+	---help---
+		Enable only after running the host tools to produce
+		generated/tokenizer_encoder.h, generated/barista_words.h and
+		generated/barista_out2in.h from the same tokenizer/layout the
+		model was exported against.  The build fails with a clear error
+		if this is enabled while any of the three headers is missing.
+
+		Without this option the application builds in self-check-only
+		mode (P1); 'chat' refuses with an explicit diagnostic rather
+		than producing plausible-looking wrong answers.
+
+endif # LVX_USE_DEMO_CONTEST2026_378_ESP32_AI

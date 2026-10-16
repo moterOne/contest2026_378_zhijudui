@@ -1,36 +1,59 @@
-# contest2026_378_zhijudui
+# contest2026_378_zhijudui（智局队）— OpenVela 移植 ESP32-P4X + Barista AI 问答
 
-👋 欢迎参加 **2026 首届 openvela AI 硬件开发者大赛**！
+## 一、作品简介
 
-这是组委会为你的队伍创建的**专属参赛仓库**（本仓为样例/模板，队伍编号 `378`；你看到的将是你自己的 `contest2026_<编号>_<队伍名>`）。比赛期间，你的全部参赛代码、打包产物与 AI Coding 日志都提交到这里。
+把 **OpenVela/NuttX 移植到 ESP32-P4X-Function-EV-Board**（新硬件适配），并在这块新板上
+运行 OpenVela/NuttX 原生应用：将上游 [`esp32-ai`](esp32-ai-main.zip) 的 **Barista**（咖啡
+问答 LLM）移植为可在真实板卡上通过串口提问、获得回答的 NSH 原生命令（`esp32_ai chat`）。
 
-> 本仓既是「代码仓」，又内置了一键拉取整套 openvela 工程的 `repo` 清单（manifest）。你只需跟它打交道，**自始至终只动一个文件夹**。
+- **板级适配（已实机验证）**：阶段 A 完成最小可启动——Make 路径构建、simple-boot 单平面
+  镜像在 `0x2000` 烧录，冷启动/复位后进入可交互 NSH；阶段 B 完成 GPIO `/dev/gpio0..2`
+  实机回读。全程只改队伍仓，公共仓（`nuttx/`）改动整理为上游补丁序列单独走 PR 流程。
+- **AI 应用（代码就绪，硬件验收进行中）**：严格遵守部署方案的阶段门槛——先 P1 资源自检
+  （`esp32_ai selftest`），再 P2 串口问答 MVP（`esp32_ai chat`）；无模型/词表错配时**明确拒绝
+  推理**，绝不输出看似正常的错误答案；不混用 S3 的固件格式、分区偏移或性能数据。
+- 亮点：单命令可退出回 NSH；存储层用“有界只读随机访问”替代不存在的 mmap；SRAM/PSRAM
+  分层分配有显式回退计数；主机侧 `tools/verify_model.py` 做离线资源校验，与设备端 FNV-1a
+  指纹严格区分。
 
----
+## 二、选题方向
 
-## 一、先读这些官方文档
+**新硬件适配**（为主）+ **AI 硬件产品创新**（应用验证）。
 
-**通用（所有赛道必读）：**
+理由：ESP32-P4X 尚无可用 OpenVela 平台基线，必须先完成板级移植（这也是本作品的主体与
+最大工作量）；Barista LLM 应用则用来证明新板具备运行 AI 推理的完整链路（Flash 数据读取、
+PSRAM 内存分层、模型/词表同版校验、串口交互）。显示、双核加速、TinyStories/Fly 等按
+实测状态另行标记，不提前承诺。
 
-| 文档                                                                                                                                     | 用途                                           |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| [《大赛总览》](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/contest_overview.md)                        | 赛道、流程、评分、资源，建议先通读             |
-| [《参赛代码提交指南》](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/code_submission_guide.md)           | 仓库获取、提交流程、时间与权限（**以此为准**） |
-| [《AI Coding 日志归集与提交手册》](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/ai_coding_log_guide.md) | 如何导出 AI 对话日志并提交到 `logs/`           |
+## 三、目录结构
 
-**按你的赛道选读（三选一）：**
+```text
+contest2026_378_zhijudui/
+├── contest2026_378_zhijudui.xml   # 本队 manifest（linkfile 映射到 openvela 编译树）
+├── openvela.xml                   # openvela 基础工程清单（官方）
+├── app/
+│   ├── esp32_ai/                  # 本作品应用：Barista 的 OpenVela 移植（NSH 命令）
+│   │   ├── runtime/               # 上游 llm.h / bpe_tokenizer.h（MIT，原样保留）
+│   │   ├── platform/              # 存储视图、SRAM/PSRAM 分层分配、时钟、FNV-1a
+│   │   ├── tools/                 # 资源生成/离线校验工具（含新增 verify_model.py）
+│   │   ├── generated/             # 生成的设备头（缺文件时构建/运行明确失败）
+│   │   ├── esp32_ai_main.c        # 命令入口：info / selftest / chat
+│   │   ├── Kconfig / Make.defs / Makefile / CMakeLists.txt
+│   │   └── README.md / PORTING-NOTES.md / LICENSE
+│   └── hello_app/                 # 组委会占位样例（保留作对照）
+├── board/contest_board/           # 自定义板卡（out-of-tree，MANIFEST 映射）
+│   ├── configs/nsh|psram|esp32_ai # 三份 defconfig：最小 NSH / PSRAM 实验 / AI 应用
+│   ├── docs/                      # 实施方案与阶段 A/B 实机记录、部署方案
+│   ├── include/ scripts/ src/     # 板级头文件、链接脚本、板级启动/外设/模型存储
+│   └── README.md
+├── quickapp/hello_quickapp/       # 组委会占位样例（未使用可删）
+├── logs/                          # AI Coding 日志（按组委会工具导出后提交）
+└── README.md                      # 本文件
+```
 
-| 赛道                  | 教程导航                                                                                                                                                 |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 快应用 / 手表应用创新 | [快应用教程导航](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/quickapp/quickapp_guide_index.md)                         |
-| AI 硬件产品创新       | [AI 硬件赛道教程导航](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/ai_hardware/ai_hardware_guide_index.md)              |
-| 新硬件适配            | [新硬件适配赛道教程导航](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/hardware_porting/hardware_porting_guide_index.md) |
+## 四、运行方式
 
----
-
-## 二、第一步：拉取完整工程
-
-用组委会提供的命令一键拉取「openvela 全量源码 + 你的专属仓」：
+### 1. 拉取完整工程
 
 ```bash
 repo init -u https://github.com/open-vela/contest2026_378_zhijudui \
@@ -38,111 +61,75 @@ repo init -u https://github.com/open-vela/contest2026_378_zhijudui \
 repo sync -c -j8
 ```
 
-同步后，你的整个仓库位于工作区的 `contest2026_378_zhijudui/`，openvela 全量源码在外层（`nuttx/`、`apps/`、`packages/`、`vendor/` 等）。
+同步后本仓位于工作区 `contest2026_378_zhijudui/`，openvela 全量源码在外层
+（`nuttx/`、`packages/`、`vendor/` 等）。manifest 通过 `<linkfile>` 把
+`app/esp32_ai`、`board/contest_board` 软链进编译树，无需手动复制。
 
----
-
-## 三、第二步：在哪里写代码
-
-**只在自己的仓目录 `contest2026_378_zhijudui/` 里开发。** 不同作品形态放在对应子目录，manifest 会通过 `<linkfile>` 把它们**软链**到 openvela 编译树该在的位置——你不用手动 copy：
-
-| 作品形态 | 你的代码放这里             | 系统自动映射到                                 |
-| -------- | -------------------------- | ---------------------------------------------- |
-| 应用     | `app/hello_app/`           | `packages/demos/contest2026_378_hello_app`     |
-| 快应用   | `quickapp/hello_quickapp/` | `packages/apps/contest2026_378_hello_quickapp` |
-| 板级适配 | `board/contest_board/`     | `vendor/openvela/boards/contest2026_378_board` |
-
-> 用不到的形态目录可以删掉；新增作品时按同样规则加子目录，并在 `contest2026_378_zhijudui.xml` 里补一条 `<linkfile>` 映射即可。**生产仓库（packages/nuttx/vendor 等）零改动。**
-
-建议仓库目录约定（便于评委定位）：
-
-```text
-app/ | quickapp/ | board/   # 你的作品代码
-logs/                       # AI Coding 日志（主动导出后提交，格式见 logs/README.md）
-README.md                   # 作品说明（提交前请改成你自己的，见第六节）
-```
-
-> 仓内附带了一个 `.gitignore.example`，给出了**编译产物**等不需要进仓的文件示例。如需启用，`cp .gitignore.example .gitignore` 后按需增删即可。**注意 `logs/` 下最终导出的 AI Coding 日志必须提交，不要忽略。**
->
-> `logs/` 的目录结构与提交格式见 [logs/README.md](logs/README.md)。
-
----
-
-## 四、第三步：编译与运行
-
-编译/运行步骤随作品形态不同而不同，请参考你所在赛道的教程导航：
-
-- 快应用 / 手表应用：[快应用教程导航](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/quickapp/quickapp_guide_index.md)（含模拟器与开发板部署）。
-- AI 硬件产品创新：[AI 硬件赛道教程导航](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/ai_hardware/ai_hardware_guide_index.md)（环境搭建、编译烧录、Skill 开发）。
-- 新硬件适配：[新硬件适配赛道教程导航](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/hardware_porting/hardware_porting_guide_index.md)（BSP 移植、最小 NSH 基线）。
-
-子目录已通过 manifest 中的 `<linkfile>` 软链进 openvela 编译树，因此构建在 openvela 工作区**根目录**（即你这个仓的上一级）进行。openvela 使用 `build.sh` 作为统一入口，接收一个 **board config 路径**作为参数：
+### 2. 构建（Make 路径）
 
 ```bash
-# 进入 openvela 工作区根目录（你的仓的上一级）
-cd ..
+# 最小 NSH（阶段 A 已验证基线）
+./build.sh vendor/openvela/boards/contest2026_378_board/configs/nsh -j8
 
-# 通用语法：第一个参数是 board config 路径，第二个参数可以是 menuconfig / distclean 等
-./build.sh <board-config-path> [menuconfig|distclean] [-j8]
+# AI 应用配置（PSRAM 用户堆 + SPI Flash MTD + /dev/model + esp32_ai 命令）
+./build.sh vendor/openvela/boards/contest2026_378_board/configs/esp32_ai -j8
 ```
 
-> 具体的 board config 路径、目标产物、模拟器/真机部署方式请以你所在赛道的教程导航为准。本仓 `app/` `quickapp/` `board/` 三个示例骨架对应的 Kconfig 选项可通过 `menuconfig` 启用。
+> CMake 路径未验证，不宣称支持；产物为 `nuttx/nuttx.bin`（simple-boot 单平面镜像）。
 
----
+### 3. 烧录与控制台
 
-## 五、第四步：提交作品
+```bash
+./.espvenv/bin/esptool.py -c esp32p4 -p /dev/ttyACM0 -b 460800 \
+    write_flash 0x2000 nuttx/nuttx.bin
+```
 
-1. **fork** 你的专属仓 → 开发 → `git commit` 并推送 → 向专属仓发起 **Pull Request**，可**自行 review 并合入**（无需等组委会）。
-2. **AI Coding 日志**：与 AI 工具的对话会自动记录到本机 staging（不会自动上传），需你**主动导出/打包**选定会话到仓内 `logs/` 目录后一并提交。详见[《AI Coding 日志归集与提交手册》](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/ai_coding_log_guide.md)。
-3. 若需改动 **nuttx 等公共仓库**，不在本仓改，而是 fork 对应公共仓、以 PR 提交到 `dev-ai-contest-2026` 分支，由组委会 review 后合入。
+控制台为板载 USB-Serial/JTAG（主机 `/dev/ttyACM0`）。
 
-> ⏰ **提交作品截止：9 月 20 日**。截止后统一收回 push 权限，仍可查看 / clone。
->
-> 获奖后再按要求将作品 PR 至 openvela 上游对应仓库（走标准 PR + CI 流程）。
+### 4. 运行 esp32_ai
 
-### 关于 PR 与 CLA
+```bash
+nsh> esp32_ai info        # 模型/资源/内存摘要
+nsh> esp32_ai selftest    # P1 自检：存储视图、模型头、限量随机读、分配/释放
+nsh> esp32_ai chat        # P2 串口问答 MVP（输入问题，回车；quit/EOF 退回 NSH）
+```
 
-- 本仓所有改动通过 **Pull Request** 合入（分支保护强制，可自行合入自己的 PR）。
-- 首次贡献需在[**官网签署 CLA**](https://openvela.com/#/community/cla)；PR 上会自动跑 `cla/signature` 检查，在官网签署成功后，在 PR 评论 `/check-cla` 复检即可通过。
+`chat` 需要提前：① 按部署方案 P0 从经授权来源获取 Barista 资源并校验；② 用
+`app/esp32_ai/tools/` 生成 `generated/` 三份头；③ 开启
+`CONFIG_ESP32_AI_BARISTA_RESOURCES`；④ 把 `model.bin` 烧到
+`CONFIG_ESP32_AI_MODEL_FLASH_OFFSET`（默认 `0x800000`）并读回校验。
 
----
+### 5. 当前状态
 
-## 六、提交前：把本 README 改成你的作品说明
+| 项 | 状态 | 依据 |
+| --- | --- | --- |
+| 最小 NSH 启动 / 冷启动 / 复位 | ✅ 已实机验证 | `docs/openvela-阶段A-实施记录.md` |
+| GPIO 回读（`/dev/gpio0..2`） | ✅ 已实机验证 | `docs/openvela-阶段B-实施记录.md` |
+| esp32_ai 应用代码与配置 | ✅ 已就绪（未触板） | `app/esp32_ai/`、`configs/esp32_ai/defconfig` |
+| PSRAM 实装容量/稳定读写 | ⏳ 待实测 | P1 门槛 |
+| 模型烧录与 `esp32_ai chat` | ⏳ 待实测 | P2 MVP |
+| 显示 / 双核 / TinyStories / Fly | ⏳ 未承诺 | P3 |
 
-本文件目前是组委会给的**使用说明书**。**作品提交前，请把它替换成你自己作品的说明**，方便评委快速了解你做了什么、怎么跑起来。建议至少包含以下内容：
-
-```markdown
-# <你的作品名>
-
-## 一、作品简介
-<一句话/一段话说明这个作品是什么、解决什么问题、亮点在哪>
-
-## 二、选题方向
-<快应用 / 手表应用创新 ｜ AI 硬件产品创新 ｜ 新硬件适配 ｜ 自定方向，并简述理由>
-
-## 三、目录结构
-<列出你这个仓里各目录/文件的作用，例如：>
-- `app/xxx/`        — <说明>
-- `board/xxx/`      — <说明>
-- `quickapp/xxx/`   — <说明>
-- `logs/`           — AI Coding 日志
-- `docs/` 或其他    — <说明>
-
-## 四、运行方式
-<拉取工程后，如何编译、烧录/部署、运行的完整步骤；最好能让评委照着一步步复现>
+详细方案、放行条件与分阶段验收见 `board/contest_board/docs/`
+（`openvela-板级适配实现方案.md`、`openvela-阶段A/B-实施记录.md`、
+`esp32-ai-移植至ESP32-P4X-OpenVela部署方案.md`）。
 
 ## 五、AI Coding 使用说明
-<说明本作品如何借助 AI 辅助开发：
-- 在需求拆解 / 方案设计 / 编码 / 调试 / 文档等环节如何与 AI 协作；
-- AI 对开发效率或质量带来的实际帮助。
-完整对话日志见 logs/ 目录>
-```
 
-> 提示：将会根据「作品本身 + 你的 README 说明 + `logs/` 里的 AI Coding 日志」来理解和评估你的作品，README 写清楚很重要。
+本作品以“先方案、后代码、按门槛放行”的方式与 AI 协作：
 
----
+- **需求拆解与方案设计**：先用 AI 起草 OpenVela 移植与 esp32-ai 部署方案（阶段 A/B 实施
+  步骤、flash/PSRAM 容量表、分阶段验收标准），明确“任一门槛不满足则停在评估”。
+- **编码**：按方案第 4 节的应用代码组织落地 `app/esp32_ai/`（存储视图、分层内存、NSH
+  命令、主机校验工具），并同步补 `contest2026_378_model.c` 板级模型存储与 `esp32_ai`
+  defconfig；AI 负责生成与自检，人工核对 NuttX 真实 API（如 `esp_spiflash_alloc_mtdpart`、
+  `kmm_*` 堆接口）并据此修正。
+- **调试/文档**：AI 整理失败日志与解决依据（如镜像偏移、HAL 适配点），并持续更新实机
+  记录；明确区分“已验证”与“待实测”，不把跳过/推测写成通过。
 
-## 附：仓库命名规范
+AI 对效率的帮助主要体现在：跨仓库 API 调研与方案落地并行推进、代码与文档一致性维护、
+以及“不混用 S3 数据/不虚报实机状态”这类约束的持续检查。完整对话日志按组委会工具导出
+至 `logs/` 目录随作品提交。
 
-`contest2026_<编号>_<队伍名>` — 编号三位零填充；队名 slug（全小写、英文/拼音、连字符）。例：`contest2026_378_zhijudui`。
-（仓库由组委会统一创建，**每队仅一个仓**，无需自行命名。）
+> 本文件为作品说明；构建/烧录细节变更时请以 `board/contest_board/README.md` 与
+> `docs/` 内实施记录为准。

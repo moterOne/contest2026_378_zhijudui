@@ -1,0 +1,36 @@
+#############################################################################
+# contest2026_378_zhijudui/board/contest_board/src/Make.defs
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+#############################################################################
+
+include $(TOPDIR)/Make.defs
+
+CSRCS = contest2026_378_boot.c contest2026_378_bringup.c
+
+ifeq ($(CONFIG_BOARDCTL),y)
+  ifeq ($(CONFIG_BOARDCTL_RESET),y)
+    CSRCS += contest2026_378_reset.c
+  endif
+endif
+
+ifeq ($(CONFIG_DEV_GPIO),y)
+  CSRCS += contest2026_378_gpio.c
+endif
+
+ifeq ($(CONFIG_ARCH_BUTTONS),y)
+  CSRCS += contest2026_378_buttons.c
+endif
+
+ifeq ($(CONFIG_ESPRESSIF_EMAC),y)
+  CSRCS += contest2026_378_ethernet.c
+endif
+
+ifeq ($(CONFIG_ESP32_AI_MODEL_STORAGE),y)
+  CSRCS += contest2026_378_model.c
+endif
+
+DEPPATH += --dep-path board
+VPATH += :board
+CFLAGS += ${INCDIR_PREFIX}$(TOPDIR)$(DELIM)arch$(DELIM)$(CONFIG_ARCH)$(DELIM)src$(DELIM)board$(DELIM)board

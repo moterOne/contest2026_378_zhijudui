@@ -1,11 +1,7 @@
 #
-# Contest 2026 team 000 board placeholder
+# contest2026_378_board (out-of-tree / custom board)
 #
-
-if ARCH_BOARD_CONTEST2026_000_BOARD
-
-config ARCH_BOARD_CONTEST2026_000_BOARD_TAG
-	string "Board tag"
-	default "contest2026_000_board"
-
-endif
+# This board is selected via ARCH_BOARD_CUSTOM (CONFIG_ARCH_BOARD_CUSTOM=y),
+# so there is no ARCH_BOARD_CONTEST2026_378_BOARD symbol to guard on here.
+# The board name is provided by CONFIG_ARCH_BOARD_CUSTOM_NAME.
+#
